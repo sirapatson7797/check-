@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RD Stock Check - ระบบเช็คสต็อก RD</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f6f8;color:#202124}
+  header{background:#17324d;color:#fff;padding:18px 16px;position:sticky;top:0;z-index:10}
+  header h1{margin:0 0 6px;font-size:24px}
+  header p{margin:0;opacity:.85}
+  .wrap{max-width:1200px;margin:auto;padding:18px}
+  .toolbar,.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 2px 10px #0000000d}
+  .toolbar{display:grid;grid-template-columns:1fr 180px 180px;gap:10px}
+  input,select,button{font:inherit;border:1px solid #d5dbe1;border-radius:9px;padding:10px}
+  button{cursor:pointer;border:0;background:#17324d;color:#fff}
+  button.secondary{background:#68737d}
+  button.danger{background:#c62828}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+  .stat{background:#fff;border-radius:14px;padding:16px}
+  .stat b{display:block;font-size:25px;margin-top:4px}
+  .table-wrap{overflow:auto}
+  table{width:100%;border-collapse:collapse;min-width:850px}
+  th,td{padding:10px;border-bottom:1px solid #e7eaed;text-align:left;vertical-align:middle}
+  th{background:#eef2f5}
+  .qty{width:110px}
+  .unit{width:120px}
+  .low{color:#c62828;font-weight:bold}
+  .ok{color:#2e7d32;font-weight:bold}
+  .actions button{padding:7px 9px;margin-right:4px}
+  .lang{display:flex;gap:6px;flex-wrap:wrap}
+  .lang button.active{background:#0b6e4f}
+  .note{font-size:13px;color:#68737d}
+  @media(max-width:700px){
+    .toolbar{grid-template-columns:1fr}
+    .stats{grid-template-columns:1fr}
+    header h1{font-size:20px}
+    .wrap{padding:10px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1 id="title">ระบบเช็คสต็อก RD</h1>
+    <p id="subtitle">Category: Ingredient</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="ค้นหาชื่อวัตถุดิบ..." oninput="render()">
+    <select id="category" onchange="render()">
+      <option value="ingredient">Ingredient</option>
+    </select>
+    <select id="language" onchange="setLanguage(this.value)">
+      <option value="th">ไทย</option>
+      <option value="lo">ລາວ</option>
+      <option value="my">မြန်မာ</option>
+      <option value="km">ខ្មែរ</option>
+    </select>
+  </section>
+
+  <section class="stats">
+    <div class="stat"><span id="s1">รายการทั้งหมด</span><b id="total">0</b></div>
+    <div class="stat"><span id="s2">มีสต็อก</span><b id="inStock">0</b></div>
+    <div class="stat"><span id="s3">ต้องเติมสต็อก</span><b id="lowStock">0</b></div>
+  </section>
+
+  <section class="card">
+    <h2 id="listTitle">รายการวัตถุดิบ — Ingredient</h2>
+    <p class="note" id="help">กรอกยอดคงเหลือและเลือกหน่วยได้ ระบบจะจำข้อมูลไว้ในเครื่องนี้อัตโนมัติ</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th id="nameHead">วัตถุดิบ</th><th id="stockHead">สต็อกคงเหลือ</th>
+            <th id="unitHead">หน่วย</th><th id="minHead">จุดแจ้งเตือน</th><th id="statusHead">สถานะ</th><th id="actionHead">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const products = [
+"แป้งมัน","พริกไทยดำหยาบ","STPP","งาขาวคั่ว","พริกไทยขาวป่น","กระเทียมผง",
+"น้ำตาลทรายขาวมิตรผล","น้ำตาลมะพร้าว","ซอสหอยนางรม","ผงน้ำปลา N221624-2",
+"Exfresh111","Sodium nitrite","TQB002F4","รากผักชีบด","เกลือป่น","น้ำมันถั่วเหลือง",
+"MSG","ซีอิ๊วขาว","น้ำมันงา","กระเทียมบด","นมสดเมจิ","นมข้นจืด","ซีอิ๊วดำ",
+"ปาปริก้าออย","capsicum","ซอสฝาเขียวภูเขาทอง","ปาปริก้า เรด","แครอทสับ",
+"สาหร่ายสับ","ใบมะกรูดซอย","พริกแกง","Potassium Sorbate","I+G","รสดีหมู",
+"น้ำปลาเมกาเชฟ","Glycine","แป้งข้าวโพด","sodium erythorbate","FS57","EX-TEX511","BML99"
+];
+
+const texts = {
+ th:{title:"ระบบเช็คสต็อก RD",subtitle:"Category: Ingredient",search:"ค้นหาชื่อวัตถุดิบ...",
+ total:"รายการทั้งหมด",stock:"มีสต็อก",low:"ต้องเติมสต็อก",list:"รายการวัตถุดิบ — Ingredient",
+ help:"กรอกยอดคงเหลือและเลือกหน่วยได้ ระบบจะจำข้อมูลไว้ในเครื่องนี้อัตโนมัติ",
+ name:"วัตถุดิบ",qty:"สต็อกคงเหลือ",unit:"หน่วย",min:"จุดแจ้งเตือน",status:"สถานะ",action:"จัดการ",
+ save:"บันทึก",clear:"ล้าง",ok:"ปกติ",lowStatus:"ต้องเติมสต็อก",unitG:"กรัม",unitKg:"กิโลกรัม",saved:"บันทึกแล้ว"},
+ lo:{title:"ລະບົບກວດສອບສະຕັອກ RD",subtitle:"Category: Ingredient",search:"ຄົ້ນຫາຊື່ວັດຖຸດິບ...",
+ total:"ລາຍການທັງໝົດ",stock:"ມີສະຕັອກ",low:"ຕ້ອງເພີ່ມສະຕັອກ",list:"ລາຍການວັດຖຸດິບ — Ingredient",
+ help:"ກອກຈຳນວນຄົງເຫຼືອ ແລະ ເລືອກໜ່ວຍ. ລະບົບຈະຈື່ຈຳຂໍ້ມູນໃນເຄື່ອງນີ້.",
+ name:"ວັດຖຸດິບ",qty:"ສະຕັອກຄົງເຫຼືອ",unit:"ໜ່ວຍ",min:"ຈຸດແຈ້ງເຕືອນ",status:"ສະຖານະ",action:"ຈັດການ",
+ save:"ບັນທຶກ",clear:"ລ້າງ",ok:"ປົກກະຕິ",lowStatus:"ຕ້ອງເພີ່ມສະຕັອກ",unitG:"ກຣາມ",unitKg:"ກິໂລກຣາມ",saved:"ບັນທຶກແລ້ວ"},
+ my:{title:"RD စတော့စစ်ဆေးမှုစနစ်",subtitle:"Category: Ingredient",search:"ကုန်ကြမ်းအမည် ရှာရန်...",
+ total:"စုစုပေါင်းစာရင်း",stock:"စတော့ရှိ",low:"စတော့ဖြည့်ရန်",list:"ကုန်ကြမ်းစာရင်း — Ingredient",
+ help:"လက်ကျန်ပမာဏနှင့် ယူနစ်ကိုရွေးပါ။ အချက်အလက်များကို ဤစက်တွင် အလိုအလျောက်သိမ်းဆည်းပါမည်။",
+ name:"ကုန်ကြမ်း",qty:"လက်ကျန်စတော့",unit:"ယူနစ်",min:"သတိပေးအဆင့်",status:"အခြေအနေ",action:"စီမံရန်",
+ save:"သိမ်းရန်",clear:"ရှင်းရန်",ok:"ပုံမှန်",lowStatus:"စတော့ဖြည့်ရန်",unitG:"ဂရမ်",unitKg:"ကီလိုဂရမ်",saved:"သိမ်းပြီးပါပြီ"},
+ km:{title:"ប្រព័ន្ធត្រួតពិនិត្យស្តុក RD",subtitle:"Category: Ingredient",search:"ស្វែងរកឈ្មោះវត្ថុធាតុដើម...",
+ total:"ចំនួនសរុប",stock:"មានស្តុក",low:"ត្រូវបន្ថែមស្តុក",list:"បញ្ជីវត្ថុធាតុដើម — Ingredient",
+ help:"បញ្ចូលចំនួនសល់ និងជ្រើសឯកតា។ ប្រព័ន្ធនឹងរក្សាទុកទិន្នន័យនៅលើឧបករណ៍នេះដោយស្វ័យប្រវត្តិ។",
+ name:"វត្ថុធាតុដើម",qty:"ស្តុកនៅសល់",unit:"ឯកតា",min:"កម្រិតជូនដំណឹង",status:"ស្ថានភាព",action:"គ្រប់គ្រង",
+ save:"រក្សាទុក",clear:"លុប",ok:"ធម្មតា",lowStatus:"ត្រូវបន្ថែមស្តុក",unitG:"ក្រាម",unitKg:"គីឡូក្រាម",saved:"បានរក្សាទុក"}
+};
+
+let lang = localStorage.getItem("rd_lang") || "th";
+let data = JSON.parse(localStorage.getItem("rd_stock_data") || "{}");
+
+function t(k){return texts[lang][k] || texts.th[k]}
+function setLanguage(v){
+  lang=v; localStorage.setItem("rd_lang",v);
+  document.documentElement.lang=v==="th"?"th":v;
+  applyText(); render();
+}
+function applyText(){
+  document.getElementById("title").textContent=t("title");
+  document.getElementById("subtitle").textContent=t("subtitle");
+  document.getElementById("search").placeholder=t("search");
+  document.getElementById("s1").textContent=t("total");
+  document.getElementById("s2").textContent=t("stock");
+  document.getElementById("s3").textContent=t("low");
+  document.getElementById("listTitle").textContent=t("list");
+  document.getElementById("help").textContent=t("help");
+  ["nameHead","stockHead","unitHead","minHead","statusHead","actionHead"].forEach((id,i)=>
+    document.getElementById(id).textContent=[t("name"),t("qty"),t("unit"),t("min"),t("status"),t("action")][i]);
+}
+function key(i){return "p"+i}
+function get(i){
+  return data[key(i)] || {qty:0,unit:"g",min:0}
+}
+function save(i){
+  const q=document.getElementById("q"+i).value;
+  const u=document.getElementById("u"+i).value;
+  const m=document.getElementById("m"+i).value;
+  data[key(i)]={qty:Math.max(0,Number(q)||0),unit:u,min:Math.max(0,Number(m)||0)};
+  localStorage.setItem("rd_stock_data",JSON.stringify(data));
+  render();
+}
+function clearItem(i){
+  data[key(i)]={qty:0,unit:"g",min:0};
+  localStorage.setItem("rd_stock_data",JSON.stringify(data));
+  render();
+}
+function render(){
+  const term=document.getElementById("search").value.toLowerCase().trim();
+  const rows=document.getElementById("rows");
+  let total=0, inStock=0, low=0, html="";
+  products.forEach((name,i)=>{
+    if(term && !name.toLowerCase().includes(term)) return;
+    const d=get(i); total++;
+    const isLow=d.qty<=d.min;
+    if(d.qty>0) inStock++;
+    if(isLow) low++;
+    html += `<tr>
+      <td>${i+1}</td>
+      <td><b>${name}</b></td>
+      <td><input class="qty" id="q${i}" type="number" min="0" step="0.01" value="${d.qty}"></td>
+      <td><select class="unit" id="u${i}">
+        <option value="g" ${d.unit==="g"?"selected":""}>${t("unitG")}</option>
+        <option value="kg" ${d.unit==="kg"?"selected":""}>${t("unitKg")}</option>
+      </select></td>
+      <td><input class="qty" id="m${i}" type="number" min="0" step="0.01" value="${d.min}"></td>
+      <td class="${isLow?"low":"ok"}">${isLow?t("lowStatus"):t("ok")}</td>
+      <td class="actions"><button onclick="save(${i})">${t("save")}</button><button class="secondary" onclick="clearItem(${i})">${t("clear")}</button></td>
+    </tr>`;
+  });
+  rows.innerHTML=html || `<tr><td colspan="7">${t("search")}</td></tr>`;
+  document.getElementById("total").textContent=term?total:products.length;
+  document.getElementById("inStock").textContent=inStock;
+  document.getElementById("lowStock").textContent=low;
+}
+document.getElementById("language").value=lang;
+applyText(); render();
+</script>
+</body>
+</html>
