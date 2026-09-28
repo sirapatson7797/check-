@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ระบบจัดการวัตถุดิบ</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f5f7fb;color:#172033}
+header{background:#172554;color:white;padding:18px 20px;position:sticky;top:0;z-index:5;box-shadow:0 2px 10px #0002}
+header h1{margin:0;font-size:22px}header p{margin:4px 0 0;opacity:.8;font-size:13px}
+.container{max-width:1200px;margin:auto;padding:18px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.card{background:white;border-radius:14px;padding:16px;box-shadow:0 2px 10px #0000000b}.card .n{font-size:28px;font-weight:800}.card small{color:#64748b}
+.grid{display:grid;grid-template-columns:350px 1fr;gap:16px}.panel{background:white;border-radius:14px;padding:16px;box-shadow:0 2px 10px #0000000b}
+h2{font-size:17px;margin:0 0 14px}label{display:block;font-size:13px;font-weight:700;margin:10px 0 5px}
+input,select,button{font:inherit}input,select{width:100%;padding:10px;border:1px solid #d7dce5;border-radius:9px;background:#fff}
+button{border:0;border-radius:9px;padding:10px 13px;cursor:pointer;font-weight:700}.primary{background:#2563eb;color:white}.secondary{background:#e8eefc;color:#1e40af}.danger{background:#fee2e2;color:#b91c1c}.success{background:#dcfce7;color:#166534}
+.actions{display:flex;gap:7px;margin-top:14px;flex-wrap:wrap}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.toolbar input{flex:1;min-width:160px}.toolbar select{width:150px}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:850px}th,td{text-align:left;padding:10px;border-bottom:1px solid #edf0f5;font-size:13px}th{background:#f8fafc;color:#475569;position:sticky;top:0}
+.badge{display:inline-block;padding:4px 8px;border-radius:99px;font-size:11px;font-weight:800}.ok{background:#dcfce7;color:#166534}.low{background:#fef3c7;color:#92400e}.out{background:#fee2e2;color:#b91c1c}.exp{background:#fee2e2;color:#b91c1c}.soon{background:#ffedd5;color:#9a3412}
+.alerts{display:grid;gap:8px;margin-bottom:16px}.alert{padding:11px 13px;border-radius:10px;font-size:13px}.alert.red{background:#fee2e2;color:#991b1b}.alert.orange{background:#ffedd5;color:#9a3412}.alert.yellow{background:#fef3c7;color:#92400e}
+.empty{text-align:center;color:#94a3b8;padding:35px}.muted{color:#64748b;font-size:12px}.editbox{background:#eff6ff;border-radius:10px;padding:9px;margin-top:10px;font-size:12px}
+@media(max-width:900px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
+@media(max-width:500px){.container{padding:10px}.cards{grid-template-columns:repeat(2,1fr)}.card{padding:12px}.card .n{font-size:23px}}
+</style>
+</head>
+<body>
+<header><h1>📦 ระบบจัดการวัตถุดิบ</h1><p>สต็อก • วันที่รับเข้า • วันที่ผลิต • วันหมดอายุ • แจ้งเตือน</p></header>
+<div class="container">
+  <div class="cards">
+    <div class="card"><div class="n" id="totalItems">0</div><small>รายการวัตถุดิบ</small></div>
+    <div class="card"><div class="n" id="totalStock">0</div><small>จำนวนสต็อกรวม</small></div>
+    <div class="card"><div class="n" id="lowCount">0</div><small>สต็อกต่ำ/หมด</small></div>
+    <div class="card"><div class="n" id="expireCount">0</div><small>ใกล้หมดอายุ/หมดอายุ</small></div>
+  </div>
+  <div id="alerts" class="alerts"></div>
+  <div class="grid">
+    <section class="panel">
+      <h2>➕ เพิ่ม / แก้ไขวัตถุดิบ</h2>
+      <input type="hidden" id="editId">
+      <label>ชื่อวัตถุดิบ</label><input id="name" placeholder="เช่น แป้งสาลี">
+      <label>รหัสวัตถุดิบ</label><input id="code" placeholder="เช่น RM-001">
+      <label>หน่วย</label>
+      <select id="unit"><option>กก.</option><option>กรัม</option><option>ลิตร</option><option>มล.</option><option>ชิ้น</option><option>กล่อง</option><option>ถุง</option><option>อื่นๆ</option></select>
+      <label>ยอดสต็อก</label><input id="stock" type="number" min="0" step="0.01" placeholder="0">
+      <label>จุดสั่งซื้อขั้นต่ำ</label><input id="minStock" type="number" min="0" step="0.01" placeholder="เช่น 10">
+      <label>วันที่รับเข้า</label><input id="received" type="date">
+      <label>วันที่ผลิต</label><input id="mfg" type="date">
+      <label>วันหมดอายุ</label><input id="exp" type="date">
+      <div class="actions">
+        <button class="primary" onclick="saveItem()">💾 บันทึก</button>
+        <button class="secondary" onclick="clearForm()">ล้างฟอร์ม</button>
+      </div>
+      <div class="editbox">ข้อมูลจะถูกเก็บไว้ในอุปกรณ์นี้ด้วย Local Storage ไม่ต้องใช้เซิร์ฟเวอร์</div>
+    </section>
+    <section class="panel">
+      <h2>📤 เบิก / ตัดสต็อก</h2>
+      <label>วัตถุดิบ</label><select id="withdrawItem"></select>
+      <label>จำนวนที่เบิก</label><input id="withdrawQty" type="number" min="0.01" step="0.01" placeholder="เช่น 2">
+      <label>วันที่เบิก</label><input id="withdrawDate" type="date">
+      <label>ผู้เบิกออก</label><input id="withdrawBy" placeholder="ชื่อผู้เบิก">
+      <label>หมายเหตุ</label><input id="withdrawNote" placeholder="เช่น ใช้ผลิตเมนู A">
+      <div class="actions"><button class="primary" onclick="withdrawStock()">📤 บันทึกการเบิก</button></div>
+      <div class="editbox">เมื่อบันทึก ระบบจะหักยอดสต็อกอัตโนมัติ และเก็บประวัติการเบิกไว้</div>
+    </section>
+    <section class="panel">
+      <h2>📋 รายการวัตถุดิบ</h2>
+      <div class="toolbar">
+        <input id="search" placeholder="🔎 ค้นหาชื่อหรือรหัส..." oninput="render()">
+        <select id="filter" onchange="render()"><option value="all">ทั้งหมด</option><option value="low">สต็อกต่ำ</option><option value="out">สต็อกหมด</option><option value="soon">ใกล้หมดอายุ</option><option value="expired">หมดอายุ</option></select>
+        <button class="secondary" onclick="exportCSV()">⬇️ CSV</button>
+        <button class="danger" onclick="clearAll()">ล้างข้อมูลทั้งหมด</button>
+      </div>
+      <div class="tablewrap"><table><thead><tr>
+        <th>วัตถุดิบ</th><th>รหัส</th><th>สต็อก</th><th>รับเข้า</th><th>ผลิต</th><th>หมดอายุ</th><th>สถานะ</th><th>จัดการ</th>
+      </tr></thead><tbody id="tbody"></tbody></table></div>
+    </section>
+  </div>
+  <section class="panel" style="margin-top:16px">
+    <h2>🧾 ประวัติการตัดสต็อก</h2>
+    <div class="toolbar"><input id="historySearch" placeholder="🔎 ค้นหาวัตถุดิบหรือผู้เบิก..." oninput="renderHistory()"><button class="secondary" onclick="exportWithdrawCSV()">⬇️ ส่งออกประวัติ CSV</button></div>
+    <div class="tablewrap"><table><thead><tr><th>วันที่เบิก</th><th>วัตถุดิบ</th><th>ผู้เบิก</th><th>จำนวน</th><th>ยอดคงเหลือ</th><th>หมายเหตุ</th></tr></thead><tbody id="historyBody"></tbody></table></div>
+  </section>
+</div>
+<script>
+const KEY="raw_material_inventory_v1";
+let items=JSON.parse(localStorage.getItem(KEY)||"[]");
+let withdrawals=JSON.parse(localStorage.getItem("raw_material_withdrawals_v1")||"[]");
+const $=id=>document.getElementById(id);
+const today=new Date(); today.setHours(0,0,0,0);
+function daysUntil(date){if(!date)return Infinity;let d=new Date(date+"T00:00:00");return Math.ceil((d-today)/86400000)}
+function status(i){
+  const d=daysUntil(i.exp);
+  if(i.stock<=0)return ["out","หมดสต็อก"];
+  if(i.stock<=i.minStock)return ["low","สต็อกต่ำ"];
+  if(d<0)return ["exp","หมดอายุ"];
+  if(d<=7)return ["soon","ใกล้หมดอายุ"];
+  return ["ok","ปกติ"];
+}
+function saveItem(){
+  const name=$("name").value.trim(), code=$("code").value.trim();
+  if(!name){alert("กรุณากรอกชื่อวัตถุดิบ");return}
+  const obj={id:$("editId").value||Date.now().toString(),name,code,unit:$("unit").value,
+    stock:Number($("stock").value||0),minStock:Number($("minStock").value||0),
+    received:$("received").value,mfg:$("mfg").value,exp:$("exp").value};
+  const idx=items.findIndex(x=>x.id===obj.id);
+  if(idx>=0)items[idx]=obj;else items.push(obj);
+  persist();clearForm();render();
+}
+function editItem(id){
+  const i=items.find(x=>x.id===id);if(!i)return;
+  $("editId").value=i.id;$("name").value=i.name;$("code").value=i.code;$("unit").value=i.unit;
+  $("stock").value=i.stock;$("minStock").value=i.minStock;$("received").value=i.received||"";
+  $("mfg").value=i.mfg||"";$("exp").value=i.exp||"";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function deleteItem(id){if(confirm("ต้องการลบรายการนี้หรือไม่?")){items=items.filter(x=>x.id!==id);persist();render()}}
+function clearForm(){["editId","name","code","stock","minStock","received","mfg","exp"].forEach(id=>$(id).value="");$("unit").value="กก."}
+function persist(){localStorage.setItem(KEY,JSON.stringify(items));localStorage.setItem("raw_material_withdrawals_v1",JSON.stringify(withdrawals))}
+function fmt(d){if(!d)return"-";const [y,m,day]=d.split("-");return `${day}/${m}/${y}`}
+function initWithdrawForm(){const s=$("withdrawItem"),cur=s.value;s.innerHTML=items.length?items.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} — คงเหลือ ${i.stock} ${esc(i.unit)}</option>`).join(""):`<option value="">ยังไม่มีวัตถุดิบ</option>`;if(items.some(i=>i.id===cur))s.value=cur;$("withdrawDate").value ||= new Date().toISOString().slice(0,10)}
+function withdrawStock(){const id=$("withdrawItem").value,qty=Number($("withdrawQty").value),by=$("withdrawBy").value.trim(),date=$("withdrawDate").value,note=$("withdrawNote").value.trim(),item=items.find(i=>i.id===id);if(!item){alert("กรุณาเพิ่มวัตถุดิบก่อน");return}if(!qty||qty<=0){alert("กรุณาระบุจำนวนที่เบิก");return}if(qty>Number(item.stock)){alert(`สต็อกไม่พอ เบิกได้สูงสุด ${item.stock} ${item.unit}`);return}if(!date){alert("กรุณาระบุวันที่เบิก");return}if(!by){alert("กรุณาระบุชื่อผู้เบิก");return}item.stock=Number((Number(item.stock)-qty).toFixed(4));withdrawals.unshift({id:Date.now().toString(),itemId:item.id,itemName:item.name,unit:item.unit,qty,date,by,note,balance:item.stock});persist();$("withdrawQty").value="";$("withdrawBy").value="";$("withdrawNote").value="";render();alert(`บันทึกการเบิก ${item.name} จำนวน ${qty} ${item.unit} เรียบร้อยแล้ว`)}
+function renderHistory(){const q=($("historySearch")?.value||"").toLowerCase(),rows=withdrawals.filter(w=>(w.itemName+" "+w.by+" "+(w.note||"")).toLowerCase().includes(q));$("historyBody").innerHTML=rows.length?rows.map(w=>`<tr><td>${fmt(w.date)}</td><td><b>${esc(w.itemName)}</b><div class="muted">${esc(w.unit)}</div></td><td>${esc(w.by)}</td><td><b>${w.qty}</b> ${esc(w.unit)}</td><td>${w.balance} ${esc(w.unit)}</td><td>${esc(w.note||"-")}</td></tr>`).join(""):`<tr><td colspan="6" class="empty">ยังไม่มีประวัติการตัดสต็อก</td></tr>`}
+function exportWithdrawCSV(){const rows=[["วันที่เบิก","วัตถุดิบ","หน่วย","ผู้เบิก","จำนวน","ยอดคงเหลือ","หมายเหตุ"],...withdrawals.map(w=>[w.date,w.itemName,w.unit,w.by,w.qty,w.balance,w.note||""])],csv="\ufeff"+rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="ประวัติการตัดสต็อก.csv";a.click()}
+
+function render(){
+  const q=$("search").value.toLowerCase(), f=$("filter").value;
+  const filtered=items.filter(i=>{
+    const s=status(i)[0], match=(i.name+" "+i.code).toLowerCase().includes(q);
+    return match&&(f==="all"|| (f==="expired"?s==="exp":f==="soon"?s==="soon":s===f));
+  });
+  $("tbody").innerHTML=filtered.length?filtered.map(i=>{
+    const [cls,label]=status(i);
+    return `<tr><td><b>${esc(i.name)}</b><div class="muted">${esc(i.unit)}</div></td><td>${esc(i.code||"-")}</td>
+    <td><b>${i.stock}</b> ${esc(i.unit)}<div class="muted">ขั้นต่ำ ${i.minStock}</div></td>
+    <td>${fmt(i.received)}</td><td>${fmt(i.mfg)}</td><td>${fmt(i.exp)}</td>
+    <td><span class="badge ${cls}">${label}</span></td>
+    <td><button class="secondary" onclick="editItem('${i.id}')">แก้ไข</button> <button class="danger" onclick="deleteItem('${i.id}')">ลบ</button></td></tr>`;
+  }).join(""):`<tr><td colspan="8" class="empty">ยังไม่มีข้อมูลวัตถุดิบ</td></tr>`;
+  $("totalItems").textContent=items.length;
+  $("totalStock").textContent=items.reduce((a,b)=>a+Number(b.stock||0),0).toLocaleString();
+  $("lowCount").textContent=items.filter(i=>["low","out"].includes(status(i)[0])).length;
+  $("expireCount").textContent=items.filter(i=>["soon","exp"].includes(status(i)[0])).length;
+  const alerts=[];
+  items.forEach(i=>{const [s,l]=status(i),d=daysUntil(i.exp);
+    if(s==="out")alerts.push(`<div class="alert red">🚨 <b>${esc(i.name)}</b> สต็อกหมด</div>`);
+    else if(s==="low")alerts.push(`<div class="alert yellow">⚠️ <b>${esc(i.name)}</b> สต็อกเหลือ ${i.stock} ${esc(i.unit)} ต่ำกว่าจุดขั้นต่ำ ${i.minStock}</div>`);
+    if(s==="exp")alerts.push(`<div class="alert red">⛔ <b>${esc(i.name)}</b> หมดอายุแล้ว (${fmt(i.exp)})</div>`);
+    else if(s==="soon")alerts.push(`<div class="alert orange">⏰ <b>${esc(i.name)}</b> จะหมดอายุใน ${d} วัน (${fmt(i.exp)})</div>`);
+  });
+  $("alerts").innerHTML=alerts.join("");
+  initWithdrawForm();
+  renderHistory();
+}
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function exportCSV(){
+  const rows=[["ชื่อวัตถุดิบ","รหัส","หน่วย","สต็อก","ขั้นต่ำ","วันที่รับเข้า","วันที่ผลิต","วันหมดอายุ","สถานะ"],
+    ...items.map(i=>[i.name,i.code,i.unit,i.stock,i.minStock,i.received,i.mfg,i.exp,status(i)[1]])];
+  const csv="\ufeff"+rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download="วัตถุดิบ.csv";a.click();
+}
+function clearAll(){if(confirm("ลบข้อมูลวัตถุดิบทั้งหมด? การกระทำนี้ย้อนกลับไม่ได้")){items=[];persist();render()}}
+render();
+</script>
+</body>
+</html>
